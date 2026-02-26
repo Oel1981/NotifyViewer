@@ -326,6 +326,46 @@
 
   .btn-print:hover { border-color: var(--accent3); color: var(--accent3); }
 
+  .tc-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 4px 8px;
+  }
+
+  .tc-toggle-label {
+    font-size: 10px;
+    color: var(--text-muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .tc-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    padding: 4px 10px;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+
+  .tc-btn:hover { color: var(--text); }
+  .tc-btn.active {
+    background: rgba(0,212,255,0.1);
+    border-color: rgba(0,212,255,0.3);
+    color: var(--accent);
+  }
+
   /* === TABLES AREA === */
   #tablesArea {
     padding: 0 32px 48px;
@@ -361,6 +401,23 @@
   .item-meta {
     font-size: 11px;
     color: var(--text-muted);
+  }
+
+  .item-description {
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-top: 4px;
+    font-family: var(--mono);
+  }
+
+  .item-number {
+    font-family: var(--display);
+    font-size: 36px;
+    font-weight: 800;
+    color: var(--accent);
+    line-height: 1;
+    min-width: 40px;
+    flex-shrink: 0;
   }
 
   /* The comparison table */
@@ -464,6 +521,8 @@
     .item-table-block { break-inside: avoid; margin-bottom: 32px; page-break-after: always; }
     .item-table-block:last-child { page-break-after: auto; }
     .item-title { color: #111 !important; font-size: 20px; }
+    .item-description { color: #444 !important; font-size: 11px; }
+    .item-number { color: #0055aa !important; font-size: 28px; }
     .cue-table { border-collapse: collapse; font-size: 9px; }
     .cue-table th { background: #f0f0f0 !important; color: #333 !important; border: 1px solid #ccc; }
     .cue-table th.tc-col { color: #0055aa !important; }
@@ -573,6 +632,12 @@
   <button class="btn btn-secondary" id="btnReset">
     ↺ Reset
   </button>
+  <!-- TC mode toggle -->
+  <div class="tc-toggle no-print">
+    <span class="tc-toggle-label">Timecode:</span>
+    <button class="tc-btn active" id="tcRelative">Relativo</button>
+    <button class="tc-btn" id="tcOffset">Con Offset</button>
+  </div>
   <button class="btn btn-print no-print" id="btnPrint" style="margin-left:auto">
     🖨️ Stampa / Salva PDF
   </button>
@@ -589,12 +654,16 @@
 <script>
 // ========== STATE ==========
 let state = {
-  mode: null, // 'single' | 'rundown'
+  mode: null,
   rawData: null,
-  allItems: [],       // {id, name, entries[]}
-  selectedItems: [],  // ids of items to render
-  notifyTracks: [],   // {id, name, color, cues[], itemId}
-  selectedNotifies: []// ids of selected notify tracks
+  allItems: [],
+  selectedItems: [],
+  notifyTracks: [],
+  selectedNotifies: [],
+  notifyGroups: [],
+  notifyByItem: [],
+  customNames: {},
+  tcMode: 'relative' // 'relative' | 'offset'
 };
 
 // ========== HELPERS ==========
@@ -631,48 +700,72 @@ function msToTCSimple(ms) {
 function parseCueFile(data) {
   const entries = data.Entries || [];
 
-  // Find all items, preserving rundown order
   const itemEntries = entries.filter(e => e.category === 'item');
   const trackEntries = entries.filter(e => e.category === 'track');
+  const rundownEntry = entries.find(e => e.category === 'rundown');
 
-  // Parse items
-  const items = itemEntries.map(e => {
+  // Rundown-level child order (defines item order in the rundown)
+  const rundownChildOrder = rundownEntry
+    ? (JSON.parse(rundownEntry.content || '{}').arrChildOrder || [])
+    : [];
+
+  // Build track map by id for fast lookup
+  const trackMap = {};
+  trackEntries.forEach(e => {
     const content = JSON.parse(e.content || '{}');
-    return {
+    const name = decode(content.Name || content.name || 'Unknown');
+    const cues = content.cues || [];
+    trackMap[e.id] = { id: e.id, name, cues, content };
+  });
+
+  // Parse items into a map first
+  const itemMap = {};
+  itemEntries.forEach(e => {
+    const content = JSON.parse(e.content || '{}');
+    const arrChildOrder = content.arrChildOrder || [];
+
+    // Get tracks ordered by item's arrChildOrder
+    const orderedTracks = arrChildOrder
+      .map(tid => trackMap[tid])
+      .filter(Boolean);
+
+    const notifyTracks = orderedTracks.filter(t => {
+      const n = t.name.toLowerCase();
+      return n === 'notify' || n.startsWith('notify ') || n.includes('notify');
+    });
+
+    const number = content.Number !== undefined && content.Number !== null
+      ? String(content.Number).trim()
+      : '';
+
+    itemMap[e.id] = {
       id: e.id,
       name: decode(content.Name || '(Senza nome)'),
+      number,
+      description: decode(content.Description || ''),
       notes: decode(content.Notes || ''),
+      tcOffset: typeof content.TCOffset === 'number' ? content.TCOffset : 0,
+      tracks: orderedTracks,
+      notifyTracks,
       content
     };
   });
 
-  // Parse tracks: map track id -> parent item id
-  // Tracks IDs look like /ABQVX/CIOVW/IRJRR/E6XHZ/ where the 3rd segment is item id
-  const tracksByItem = {};
-  trackEntries.forEach(e => {
-    const parts = e.id.split('/').filter(Boolean);
-    // parts: [projectId, rundownId, itemId, trackId]
-    const itemId = parts.length >= 4 ? '/' + parts[0] + '/' + parts[1] + '/' + parts[2] + '/' : null;
-    const content = JSON.parse(e.content || '{}');
-    const name = decode(content.Name || content.name || 'Unknown');
-    const cues = content.cues || [];
-
-    const track = { id: e.id, name, cues, content };
-
-    if (itemId) {
-      if (!tracksByItem[itemId]) tracksByItem[itemId] = [];
-      tracksByItem[itemId].push(track);
-    }
-  });
-
-  // Attach tracks to items
-  items.forEach(item => {
-    item.tracks = tracksByItem[item.id] || [];
-    item.notifyTracks = item.tracks.filter(t => {
-      const n = t.name.toLowerCase();
-      return n === 'notify' || n.startsWith('notify ') || n.includes('notify');
+  // Order items by rundown's arrChildOrder if available, else keep parse order
+  let items;
+  if (rundownChildOrder.length > 0) {
+    items = rundownChildOrder
+      .map(id => itemMap[id])
+      .filter(Boolean);
+    Object.values(itemMap).forEach(item => {
+      if (!items.find(i => i.id === item.id)) items.push(item);
     });
-  });
+  } else {
+    items = Object.values(itemMap);
+  }
+
+  // Assign positional index for fallback numbering
+  items.forEach((item, i) => { item.index = i; });
 
   return { items };
 }
@@ -744,10 +837,12 @@ function buildItemSelector() {
   });
   chips.appendChild(all);
 
-  state.allItems.forEach(item => {
+  state.allItems.forEach((item, index) => {
     const chip = document.createElement('div');
     chip.className = 'item-chip';
-    chip.textContent = item.name;
+    const num = item.number || '—';
+    chip.textContent = `${num} · ${item.name}`;
+    chip.title = item.name;
     chip.dataset.id = item.id;
     chip.addEventListener('click', () => {
       const idx = state.selectedItems.indexOf(item.id);
@@ -996,17 +1091,30 @@ function buildItemTable(item, notifyGroups) {
   const block = document.createElement('div');
   block.className = 'item-table-block';
 
-  // Header
+  // Header — number + name + description
   const hdr = document.createElement('div');
   hdr.className = 'item-header';
+  const num = item.number || '—';
+  const numberHtml = `<div class="item-number">${num}</div>`;
+  const descHtml = item.description
+    ? `<div class="item-description">${item.description}</div>`
+    : '';
   hdr.innerHTML = `
-    <div class="item-title">${item.name}</div>
+    <div style="display:flex; align-items:baseline; gap:14px; flex-wrap:wrap;">
+      ${numberHtml}
+      <div>
+        <div class="item-title">${item.name}</div>
+        ${descHtml}
+      </div>
+    </div>
     <div class="item-meta">${notifyGroups.length} notify track${notifyGroups.length !== 1 ? 's' : ''}</div>
   `;
   block.appendChild(hdr);
 
-  // Get this item's notify tracks for each selected group
-  // Each group has tracks[] with itemId; find the one matching this item
+  // TC offset for this item (used only in offset mode)
+  const tcOffset = (state.tcMode === 'offset' && item.tcOffset && item.tcOffset > -10000000000)
+    ? item.tcOffset : 0;
+
   const columns = notifyGroups.map(g => {
     const track = g.tracks.find(t => t.itemId === item.id);
     const customName = state.customNames && state.customNames[g.id];
@@ -1023,10 +1131,7 @@ function buildItemTable(item, notifyGroups) {
     col.cues.forEach(cue => allTimes.add(cue.Start));
   });
 
-  // Also add note markers at notable points if no cues
-  if (allTimes.size === 0) {
-    allTimes.add(0);
-  }
+  if (allTimes.size === 0) allTimes.add(0);
 
   const sortedTimes = Array.from(allTimes).sort((a, b) => a - b);
 
@@ -1042,10 +1147,9 @@ function buildItemTable(item, notifyGroups) {
   const hr = document.createElement('tr');
   const thTC = document.createElement('th');
   thTC.className = 'tc-col';
-  thTC.textContent = 'TIMECODE';
+  thTC.textContent = state.tcMode === 'offset' ? 'TIMECODE (OFS)' : 'TIMECODE';
   hr.appendChild(thTC);
 
-  // Note column if any notes
   if (itemNotes.length > 0) {
     const thN = document.createElement('th');
     thN.textContent = 'NOTE ITEM';
@@ -1063,10 +1167,8 @@ function buildItemTable(item, notifyGroups) {
   thead.appendChild(hr);
   table.appendChild(thead);
 
-  // Rows
   const tbody = document.createElement('tbody');
 
-  // Build cue lookup: time -> cue[] per column
   const cuesByTime = {};
   sortedTimes.forEach(t => { cuesByTime[t] = {}; });
   columns.forEach((col, ci) => {
@@ -1077,23 +1179,20 @@ function buildItemTable(item, notifyGroups) {
     });
   });
 
-  // If we have item notes, add a note row at tc=0
   if (itemNotes.length > 0 && !sortedTimes.includes(0)) {
     sortedTimes.unshift(0);
     sortedTimes.sort((a,b) => a-b);
     cuesByTime[0] = cuesByTime[0] || {};
   }
 
-  sortedTimes.forEach((tc, rowIdx) => {
+  sortedTimes.forEach((tc) => {
     const row = document.createElement('tr');
 
-    // TC cell
     const tdTC = document.createElement('td');
     tdTC.className = 'tc-cell';
-    tdTC.textContent = msToTCSimple(tc);
+    tdTC.textContent = msToTCSimple(tc + tcOffset);
     row.appendChild(tdTC);
 
-    // Note cell if applicable
     if (itemNotes.length > 0) {
       const tdN = document.createElement('td');
       if (tc === 0) {
@@ -1103,13 +1202,10 @@ function buildItemTable(item, notifyGroups) {
       row.appendChild(tdN);
     }
 
-    let hasContent = false;
-    // Notify columns
     columns.forEach((col, ci) => {
       const td = document.createElement('td');
       const cues = cuesByTime[tc] && cuesByTime[tc][ci];
       if (cues && cues.length) {
-        hasContent = true;
         cues.forEach(cue => {
           const div = document.createElement('div');
           div.className = 'cue-text';
@@ -1126,7 +1222,6 @@ function buildItemTable(item, notifyGroups) {
     tbody.appendChild(row);
   });
 
-  // Empty table case
   if (sortedTimes.length === 0) {
     const row = document.createElement('tr');
     const td = document.createElement('td');
@@ -1153,7 +1248,9 @@ document.getElementById('btnPrint').addEventListener('click', () => {
 
 // ========== RESET (full) ==========
 function doFullReset() {
-  state = { mode: null, rawData: null, allItems: [], selectedItems: [], notifyTracks: [], selectedNotifies: [], notifyGroups: [], customNames: {} };
+  state = { mode: null, rawData: null, allItems: [], selectedItems: [], notifyTracks: [], selectedNotifies: [], notifyGroups: [], notifyByItem: [], customNames: {}, tcMode: 'relative' };
+  document.getElementById('tcRelative').classList.add('active');
+  document.getElementById('tcOffset').classList.remove('active');
   document.getElementById('singleLoaded').style.display = 'none';
   document.getElementById('rundownLoaded').style.display = 'none';
   document.getElementById('itemSelector').classList.remove('visible');
@@ -1184,7 +1281,18 @@ document.getElementById('btnResetRundown').addEventListener('click', () => {
   }
 });
 
-// ========== FILE EVENTS ==========
+// ========== TC MODE TOGGLE ==========
+document.getElementById('tcRelative').addEventListener('click', () => {
+  state.tcMode = 'relative';
+  document.getElementById('tcRelative').classList.add('active');
+  document.getElementById('tcOffset').classList.remove('active');
+});
+
+document.getElementById('tcOffset').addEventListener('click', () => {
+  state.tcMode = 'offset';
+  document.getElementById('tcOffset').classList.add('active');
+  document.getElementById('tcRelative').classList.remove('active');
+});
 function setupDropZone(zoneId, inputId, mode) {
   const zone = document.getElementById(zoneId);
   const input = document.getElementById(inputId);
