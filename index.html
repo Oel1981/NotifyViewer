@@ -1,0 +1,1215 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CuePilot Notify Viewer</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Barlow+Condensed:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0c10;
+    --surface: #111318;
+    --surface2: #181c24;
+    --border: #252a36;
+    --accent: #00d4ff;
+    --accent2: #ff6b35;
+    --accent3: #7fff6b;
+    --text: #e8eaf0;
+    --text-dim: #6b7280;
+    --text-muted: #3a4050;
+    --mono: 'JetBrains Mono', monospace;
+    --display: 'Barlow Condensed', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* === HEADER === */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 32px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(10px);
+  }
+
+  .logo {
+    font-family: var(--display);
+    font-size: 27px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    color: var(--text);
+  }
+
+  .logo span { color: var(--text-dim); font-weight: 400; }
+  .logo-copy { font-size: 9px; font-weight: 400; letter-spacing: 2px; color: #4a5060; margin-top: 6px; font-family: 'Futura', 'Century Gothic', 'Trebuchet MS', sans-serif; }
+
+  .header-sep { flex: 1; }
+
+  /* === UPLOAD ZONE === */
+  .upload-section {
+    padding: 32px;
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .upload-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 24px;
+    flex: 1;
+    min-width: 280px;
+    transition: border-color 0.2s;
+  }
+
+  .upload-card:hover { border-color: var(--accent); }
+
+  .upload-card h2 {
+    font-family: var(--display);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 12px;
+  }
+
+  .upload-card p {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+    line-height: 1.6;
+  }
+
+  .drop-zone {
+    border: 2px dashed var(--border);
+    border-radius: 6px;
+    padding: 32px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+  }
+
+  .drop-zone:hover, .drop-zone.drag-over {
+    border-color: var(--accent);
+    background: rgba(0,212,255,0.04);
+  }
+
+  .drop-zone input[type=file] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+
+  .drop-zone .label {
+    font-size: 12px;
+    color: var(--text-dim);
+    display: block;
+  }
+
+  .drop-zone .hint {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 4px;
+    display: block;
+  }
+
+  .file-loaded {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+    padding: 8px 12px;
+    background: rgba(0,212,255,0.08);
+    border: 1px solid rgba(0,212,255,0.2);
+    border-radius: 4px;
+    font-size: 11px;
+    color: var(--accent);
+  }
+
+  .file-loaded .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent3);
+    flex-shrink: 0;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  /* === ITEM SELECTOR (rundown mode) === */
+  #itemSelector {
+    padding: 0 32px 24px;
+    display: none;
+  }
+
+  #itemSelector.visible { display: block; }
+
+  .section-label {
+    font-family: var(--display);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 12px;
+  }
+
+  .item-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .item-chip {
+    padding: 6px 14px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    font-size: 11px;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+
+  .item-chip:hover { border-color: var(--accent); color: var(--accent); }
+  .item-chip.active {
+    background: rgba(0,212,255,0.1);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* === NOTIFY SELECTOR === */
+  #notifySelector {
+    padding: 0 32px 24px;
+    display: none;
+  }
+
+  #notifySelector.visible { display: block; }
+
+  .notify-list {
+    max-height: 320px;
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+
+  .notify-group-items {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 8px;
+  }
+
+  .notify-item {
+    padding: 10px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .notify-item:hover { border-color: var(--accent); }
+
+  .notify-item input[type=checkbox] { accent-color: var(--accent); }
+
+  .notify-item-info { flex: 1; min-width: 0; }
+  .notify-item-name { font-size: 11px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .notify-item-sub { font-size: 10px; color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+  .notify-item-count { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+
+  .notify-color-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  /* Notify grouped by item */
+  .notify-group-block {
+    margin-bottom: 16px;
+  }
+
+  .notify-group-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .notify-group-title {
+    font-family: var(--display);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .notify-group-count {
+    font-size: 10px;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+
+  /* === CONTROLS === */
+  .controls {
+    padding: 0 32px 24px;
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .btn {
+    padding: 10px 24px;
+    border: none;
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #000;
+  }
+
+  .btn-primary:hover { background: #00bbdd; }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .btn-secondary {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+  }
+
+  .btn-secondary:hover { border-color: var(--accent2); color: var(--accent2); }
+
+  .btn-print {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    margin-left: auto;
+  }
+
+  .btn-print:hover { border-color: var(--accent3); color: var(--accent3); }
+
+  /* === TABLES AREA === */
+  #tablesArea {
+    padding: 0 32px 48px;
+  }
+
+  .item-table-block {
+    margin-bottom: 48px;
+    animation: fadeIn 0.3s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .item-header {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .item-title {
+    font-family: var(--display);
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    color: var(--text);
+  }
+
+  .item-meta {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  /* The comparison table */
+  .cue-table-wrapper {
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+
+  .cue-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+    table-layout: fixed;
+  }
+
+  .cue-table th {
+    background: var(--surface2);
+    padding: 10px 16px;
+    text-align: left;
+    font-family: var(--display);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    border-bottom: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .cue-table th.tc-col { width: 110px; color: var(--accent); }
+  .cue-table th:last-child { border-right: none; }
+
+  .cue-table td {
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    vertical-align: top;
+    line-height: 1.4;
+  }
+
+  .cue-table td:last-child { border-right: none; }
+
+  .cue-table tr:last-child td { border-bottom: none; }
+
+  .cue-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+  .tc-cell {
+    color: var(--accent);
+    font-weight: 600;
+    font-size: 12px;
+    white-space: nowrap;
+    font-family: var(--mono);
+  }
+
+  .note-row td { background: rgba(255,107,53,0.05); }
+  .note-row .tc-cell { color: var(--accent2); }
+  .note-cell { color: var(--accent2); font-style: italic; }
+
+  .cue-text {
+    color: var(--text);
+    max-width: 220px;
+  }
+
+  .cue-text-color {
+    display: inline-block;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    margin-right: 5px;
+    vertical-align: middle;
+    flex-shrink: 0;
+  }
+
+  .empty-cell { color: var(--text-muted); }
+
+  /* === EMPTY STATE === */
+  .empty-state {
+    text-align: center;
+    padding: 80px 32px;
+    color: var(--text-muted);
+  }
+
+  .empty-state .big-icon { font-size: 48px; margin-bottom: 16px; display: block; opacity: 0.5; }
+  .empty-state h3 { font-family: var(--display); font-size: 20px; font-weight: 700; color: var(--text-dim); margin-bottom: 8px; }
+  .empty-state p { font-size: 12px; line-height: 1.6; }
+
+  /* === SCROLLBAR === */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* === PRINT === */
+  @media print {
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    body { background: #fff !important; color: #111 !important; font-family: 'JetBrains Mono', monospace; }
+    header, .upload-section, #itemSelector, #notifySelector, .controls, .no-print { display: none !important; }
+    #tablesArea { padding: 0; }
+    .item-table-block { break-inside: avoid; margin-bottom: 32px; page-break-after: always; }
+    .item-table-block:last-child { page-break-after: auto; }
+    .item-title { color: #111 !important; font-size: 20px; }
+    .cue-table { border-collapse: collapse; font-size: 9px; }
+    .cue-table th { background: #f0f0f0 !important; color: #333 !important; border: 1px solid #ccc; }
+    .cue-table th.tc-col { color: #0055aa !important; }
+    .cue-table td { border: 1px solid #ddd; padding: 4px 8px; color: #111 !important; }
+    .cue-text { color: #111 !important; }
+    .empty-cell { color: #999 !important; }
+    .tc-cell { color: #0055aa !important; }
+    .note-row td { background: #fff8f0 !important; }
+    .note-row .tc-cell { color: #cc3300 !important; }
+    .note-cell { color: #cc3300 !important; }
+    .item-header { border-bottom: 1px solid #ccc; }
+  }
+
+  /* tag mode style */
+  .mode-badge {
+    padding: 3px 10px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .mode-single { background: rgba(0,212,255,0.1); color: var(--accent); border: 1px solid rgba(0,212,255,0.2); }
+  .mode-rundown { background: rgba(127,255,107,0.1); color: var(--accent3); border: 1px solid rgba(127,255,107,0.2); }
+
+  .btn-reset-card {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 13px;
+    padding: 0 2px;
+    line-height: 1;
+    transition: color 0.15s;
+    flex-shrink: 0;
+  }
+  .btn-reset-card:hover { color: var(--accent2); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">CuePilot <span>/ Notify Viewer</span>
+    <div class="logo-copy">©LeoCianci</div>
+  </div>
+  <div class="header-sep"></div>
+  <div id="modeBadge" style="display:none"></div>
+</header>
+
+<div class="upload-section">
+  <!-- Single Item -->
+  <div class="upload-card">
+    <h2>Singolo Item</h2>
+    <p>Carica un file .cue esportato come singolo item da CuePilot.<br>Genera una tabella per quell'item.</p>
+    <div class="drop-zone" id="dropSingle">
+      <input type="file" id="fileSingle" accept=".cue,.json" />
+      <span class="label">Trascina il file .cue qui</span>
+      <span class="hint">oppure clicca per selezionare</span>
+    </div>
+    <div id="singleLoaded" style="display:none" class="file-loaded">
+      <span class="dot"></span>
+      <span id="singleFileName" style="flex:1">—</span>
+      <button class="btn-reset-card" id="btnResetSingle" title="Rimuovi file">✕</button>
+    </div>
+  </div>
+
+  <!-- Rundown -->
+  <div class="upload-card">
+    <h2>Rundown Completo</h2>
+    <p>Carica un file .cue dell'intero rundown da CuePilot.<br>Genera una tabella per ogni item del rundown.</p>
+    <div class="drop-zone" id="dropRundown">
+      <input type="file" id="fileRundown" accept=".cue,.json" />
+      <span class="label">Trascina il file .cue qui</span>
+      <span class="hint">oppure clicca per selezionare</span>
+    </div>
+    <div id="rundownLoaded" style="display:none" class="file-loaded">
+      <span class="dot"></span>
+      <span id="rundownFileName" style="flex:1">—</span>
+      <button class="btn-reset-card" id="btnResetRundown" title="Rimuovi file">✕</button>
+    </div>
+  </div>
+</div>
+
+<!-- Item selector for rundown mode -->
+<div id="itemSelector">
+  <div style="padding: 0 0 12px;">
+    <span class="section-label">Seleziona Items del Rundown</span>
+    <span style="font-size:10px; color:var(--text-muted); margin-left:8px;">(Seleziona "TUTTI" o singoli items)</span>
+  </div>
+  <div class="item-chips" id="itemChips"></div>
+</div>
+
+<!-- Notify track selector -->
+<div id="notifySelector">
+  <div style="padding: 0 0 12px;">
+    <span class="section-label">Seleziona Notify da confrontare</span>
+    <span style="font-size:10px; color:var(--text-muted); margin-left:8px;">(Massimo 4 colonne)</span>
+  </div>
+  <div class="notify-list" id="notifyList"></div>
+</div>
+
+<!-- Action buttons -->
+<div class="controls" id="controls" style="display:none">
+  <button class="btn btn-primary" id="btnGenerate">
+    ⚡ Genera Tabella
+  </button>
+  <button class="btn btn-secondary" id="btnReset">
+    ↺ Reset
+  </button>
+  <button class="btn btn-print no-print" id="btnPrint" style="margin-left:auto">
+    🖨️ Stampa / Salva PDF
+  </button>
+</div>
+
+<!-- Output -->
+<div id="tablesArea">
+  <div class="empty-state" id="emptyState">
+    <h3>Nessun dato caricato</h3>
+    <p>Carica un file .cue singolo o il rundown completo<br>per visualizzare e confrontare le notify.</p>
+  </div>
+</div>
+
+<script>
+// ========== STATE ==========
+let state = {
+  mode: null, // 'single' | 'rundown'
+  rawData: null,
+  allItems: [],       // {id, name, entries[]}
+  selectedItems: [],  // ids of items to render
+  notifyTracks: [],   // {id, name, color, cues[], itemId}
+  selectedNotifies: []// ids of selected notify tracks
+};
+
+// ========== HELPERS ==========
+function decode(s) {
+  try { return s ? decodeURIComponent(s.replace(/\+/g,' ')) : ''; }
+  catch(e) { return s || ''; }
+}
+
+function msToTC(ms) {
+  if (ms === null || ms === undefined) return '--:--:--';
+  const neg = ms < 0;
+  const abs = Math.abs(ms);
+  const h = Math.floor(abs / 3600000);
+  const m = Math.floor((abs % 3600000) / 60000);
+  const s = Math.floor((abs % 60000) / 1000);
+  const frames = Math.floor((abs % 1000) / 40); // ~25fps
+  const tc = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}:${String(frames).padStart(2,'0')}`;
+  return neg ? `-${tc}` : tc;
+}
+
+function msToTCSimple(ms) {
+  if (ms === null || ms === undefined) return '--:--:--';
+  const neg = ms < 0;
+  const abs = Math.abs(ms);
+  const h = Math.floor(abs / 3600000);
+  const m = Math.floor((abs % 3600000) / 60000);
+  const s = Math.floor((abs % 60000) / 1000);
+  const frames = Math.floor((abs % 1000) / 40);
+  const tc = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}:${String(frames).padStart(2,'0')}`;
+  return (neg ? '- ' : '') + tc;
+}
+
+// ========== PARSE CUE FILE ==========
+function parseCueFile(data) {
+  const entries = data.Entries || [];
+
+  // Find all items, preserving rundown order
+  const itemEntries = entries.filter(e => e.category === 'item');
+  const trackEntries = entries.filter(e => e.category === 'track');
+
+  // Parse items
+  const items = itemEntries.map(e => {
+    const content = JSON.parse(e.content || '{}');
+    return {
+      id: e.id,
+      name: decode(content.Name || '(Senza nome)'),
+      notes: decode(content.Notes || ''),
+      content
+    };
+  });
+
+  // Parse tracks: map track id -> parent item id
+  // Tracks IDs look like /ABQVX/CIOVW/IRJRR/E6XHZ/ where the 3rd segment is item id
+  const tracksByItem = {};
+  trackEntries.forEach(e => {
+    const parts = e.id.split('/').filter(Boolean);
+    // parts: [projectId, rundownId, itemId, trackId]
+    const itemId = parts.length >= 4 ? '/' + parts[0] + '/' + parts[1] + '/' + parts[2] + '/' : null;
+    const content = JSON.parse(e.content || '{}');
+    const name = decode(content.Name || content.name || 'Unknown');
+    const cues = content.cues || [];
+
+    const track = { id: e.id, name, cues, content };
+
+    if (itemId) {
+      if (!tracksByItem[itemId]) tracksByItem[itemId] = [];
+      tracksByItem[itemId].push(track);
+    }
+  });
+
+  // Attach tracks to items
+  items.forEach(item => {
+    item.tracks = tracksByItem[item.id] || [];
+    item.notifyTracks = item.tracks.filter(t => {
+      const n = t.name.toLowerCase();
+      return n === 'notify' || n.startsWith('notify ') || n.includes('notify');
+    });
+  });
+
+  return { items };
+}
+
+// ========== FILE LOADING ==========
+function loadFile(file, mode) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      state.mode = mode;
+      state.rawData = data;
+      const parsed = parseCueFile(data);
+      state.allItems = parsed.items;
+      state.selectedItems = [];
+      state.selectedNotifies = [];
+
+      if (mode === 'single') {
+        document.getElementById('singleFileName').textContent = file.name;
+        document.getElementById('singleLoaded').style.display = 'flex';
+        document.getElementById('modeBadge').innerHTML = '<span class="mode-badge mode-single">SINGLE ITEM</span>';
+        document.getElementById('modeBadge').style.display = 'block';
+        // Auto-select the single item
+        state.selectedItems = state.allItems.map(i => i.id);
+      } else {
+        document.getElementById('rundownFileName').textContent = file.name;
+        document.getElementById('rundownLoaded').style.display = 'flex';
+        document.getElementById('modeBadge').innerHTML = '<span class="mode-badge mode-rundown">RUNDOWN</span>';
+        document.getElementById('modeBadge').style.display = 'block';
+      }
+
+      buildItemSelector();
+      buildNotifySelector();
+      document.getElementById('controls').style.display = 'flex';
+      document.getElementById('emptyState').style.display = 'none';
+
+    } catch(err) {
+      alert('Errore nel parsing del file: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+// ========== UI: ITEM SELECTOR ==========
+function buildItemSelector() {
+  if (state.mode === 'single') {
+    document.getElementById('itemSelector').classList.remove('visible');
+    return;
+  }
+  const sel = document.getElementById('itemSelector');
+  sel.classList.add('visible');
+  const chips = document.getElementById('itemChips');
+  chips.innerHTML = '';
+
+  // "Tutti" chip
+  const all = document.createElement('div');
+  all.className = 'item-chip active';
+  all.textContent = 'TUTTI';
+  all.dataset.id = '__all__';
+  all.addEventListener('click', () => {
+    const allSelected = state.selectedItems.length === state.allItems.length;
+    if (allSelected) {
+      state.selectedItems = [];
+    } else {
+      state.selectedItems = state.allItems.map(i => i.id);
+    }
+    updateItemChips();
+    buildNotifySelector();
+  });
+  chips.appendChild(all);
+
+  state.allItems.forEach(item => {
+    const chip = document.createElement('div');
+    chip.className = 'item-chip';
+    chip.textContent = item.name;
+    chip.dataset.id = item.id;
+    chip.addEventListener('click', () => {
+      const idx = state.selectedItems.indexOf(item.id);
+      if (idx >= 0) state.selectedItems.splice(idx, 1);
+      else state.selectedItems.push(item.id);
+      updateItemChips();
+      buildNotifySelector();
+    });
+    chips.appendChild(chip);
+  });
+
+  // Start with all selected
+  state.selectedItems = state.allItems.map(i => i.id);
+  updateItemChips();
+}
+
+function updateItemChips() {
+  const chips = document.querySelectorAll('#itemChips .item-chip');
+  const allSelected = state.selectedItems.length === state.allItems.length;
+  chips.forEach(chip => {
+    if (chip.dataset.id === '__all__') {
+      chip.classList.toggle('active', allSelected);
+    } else {
+      chip.classList.toggle('active', state.selectedItems.includes(chip.dataset.id));
+    }
+  });
+}
+
+// ========== UI: NOTIFY SELECTOR ==========
+function buildNotifySelector() {
+  const sel = document.getElementById('notifySelector');
+
+  const relevantItems = state.allItems.filter(i => state.selectedItems.includes(i.id));
+
+  // Build per-item groups of notify tracks
+  // state.notifyGroups: flat list of all groups (for selectedNotifies lookup)
+  // state.notifyByItem: [{item, groups[]}] for rendering and table generation
+  const allGroups = [];
+  const notifyByItem = [];
+
+  relevantItems.forEach(item => {
+    const itemGroups = [];
+
+    // Always assign progressive number + name to every notify track
+    let notifyIndex = 0;
+
+    item.notifyTracks.forEach(track => {
+      notifyIndex++;
+      const isGeneric = track.name.trim().toLowerCase() === 'notify';
+      const label = isGeneric
+        ? `Notify #${notifyIndex}`
+        : `Notify #${notifyIndex} / ${track.name}`;
+      const group = {
+        id: track.id,
+        name: track.name,
+        label,
+        tracks: [{ ...track, itemId: item.id, itemName: item.name }],
+        totalCues: track.cues.length,
+        itemId: item.id
+      };
+      itemGroups.push(group);
+      allGroups.push(group);
+    });
+
+    if (itemGroups.length > 0) {
+      notifyByItem.push({ item, groups: itemGroups });
+    }
+  });
+
+  state.notifyGroups = allGroups;
+  state.notifyByItem = notifyByItem;
+  state.selectedNotifies = [];
+
+  if (allGroups.length === 0) {
+    sel.classList.remove('visible');
+    return;
+  }
+
+  sel.classList.add('visible');
+  const list = document.getElementById('notifyList');
+  list.innerHTML = '';
+
+  notifyByItem.forEach(({ item, groups }) => {
+    const block = document.createElement('div');
+    block.className = 'notify-group-block';
+
+    // Header row with item name + select-all for this item
+    const hdr = document.createElement('div');
+    hdr.className = 'notify-group-header';
+
+    const title = document.createElement('div');
+    title.className = 'notify-group-title';
+    title.textContent = item.name;
+    title.title = item.name;
+
+    const count = document.createElement('div');
+    count.className = 'notify-group-count';
+    count.textContent = `${groups.length} track`;
+
+    // "Seleziona tutte" link for this item
+    const selAll = document.createElement('span');
+    selAll.style.cssText = 'font-size:10px; color:var(--accent); cursor:pointer; margin-left:auto; white-space:nowrap;';
+    selAll.textContent = 'seleziona tutte';
+    selAll.addEventListener('click', () => {
+      const allChecked = groups.every(g => state.selectedNotifies.includes(g.id));
+      groups.forEach(g => {
+        const cb = document.getElementById('cb_' + g.id);
+        if (allChecked) {
+          state.selectedNotifies = state.selectedNotifies.filter(x => x !== g.id);
+          if (cb) cb.checked = false;
+        } else {
+          if (!state.selectedNotifies.includes(g.id)) state.selectedNotifies.push(g.id);
+          if (cb) cb.checked = true;
+        }
+      });
+      selAll.textContent = allChecked ? 'seleziona tutte' : 'deseleziona tutte';
+    });
+
+    hdr.appendChild(title);
+    hdr.appendChild(count);
+    hdr.appendChild(selAll);
+    block.appendChild(hdr);
+
+    const itemsGrid = document.createElement('div');
+    itemsGrid.className = 'notify-group-items';
+
+    groups.forEach(group => {
+      // Initialize custom name store
+      if (!state.customNames) state.customNames = {};
+      if (state.customNames[group.id] === undefined) state.customNames[group.id] = '';
+
+      const el = document.createElement('div');
+      el.className = 'notify-item';
+      el.style.cssText = 'flex-direction:column; align-items:stretch; gap:6px; overflow:hidden;';
+
+      // Top row: checkbox + dot + label + cue count
+      const topRow = document.createElement('div');
+      topRow.style.cssText = 'display:flex; align-items:center; gap:8px; cursor:pointer;';
+
+      let dotColor = '#555';
+      if (group.tracks[0] && group.tracks[0].cues[0]) {
+        dotColor = group.tracks[0].cues[0].color || '#555';
+      }
+
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.id = 'cb_' + group.id;
+      cb.checked = false;
+      cb.addEventListener('change', () => {
+        if (cb.checked) {
+          if (!state.selectedNotifies.includes(group.id)) state.selectedNotifies.push(group.id);
+        } else {
+          state.selectedNotifies = state.selectedNotifies.filter(x => x !== group.id);
+        }
+      });
+
+      const dot = document.createElement('span');
+      dot.className = 'notify-color-dot';
+      dot.style.background = dotColor;
+
+      const info = document.createElement('div');
+      info.className = 'notify-item-info';
+      info.style.flex = '1';
+      info.innerHTML = `<div class="notify-item-name">${group.label}</div><div class="notify-item-count">${group.totalCues} cue${group.totalCues !== 1 ? 's' : ''}</div>`;
+
+      topRow.appendChild(cb);
+      topRow.appendChild(dot);
+      topRow.appendChild(info);
+      topRow.addEventListener('click', (e) => { if (e.target !== cb) cb.click(); });
+
+      // Bottom row: custom name input
+      const inputWrap = document.createElement('div');
+      inputWrap.style.cssText = 'display:flex; align-items:center; gap:6px; padding-top:2px;';
+
+      const inputLabel = document.createElement('span');
+      inputLabel.style.cssText = 'font-size:9px; color:var(--text-muted); white-space:nowrap; letter-spacing:0.5px; flex-shrink:0;';
+      inputLabel.textContent = 'Rinomina:';
+
+      const nameInput = document.createElement('input');
+      nameInput.type = 'text';
+      nameInput.placeholder = '...';
+      nameInput.value = state.customNames[group.id];
+      nameInput.style.cssText = `
+        flex: 1;
+        min-width: 0;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 3px;
+        padding: 3px 6px;
+        font-family: var(--mono);
+        font-size: 10px;
+        color: var(--text);
+        outline: none;
+        transition: border-color 0.15s;
+        box-sizing: border-box;
+        width: 100%;
+      `;
+      nameInput.addEventListener('focus', () => nameInput.style.borderColor = 'var(--accent)');
+      nameInput.addEventListener('blur', () => nameInput.style.borderColor = 'var(--border)');
+      nameInput.addEventListener('input', () => {
+        state.customNames[group.id] = nameInput.value.trim();
+      });
+      // Prevent click on input from toggling checkbox
+      nameInput.addEventListener('click', e => e.stopPropagation());
+
+      inputWrap.appendChild(inputLabel);
+      inputWrap.appendChild(nameInput);
+
+      el.appendChild(topRow);
+      el.appendChild(inputWrap);
+      itemsGrid.appendChild(el);
+    });
+
+    block.appendChild(itemsGrid);
+    list.appendChild(block);
+  });
+}
+
+// ========== GENERATE TABLES ==========
+document.getElementById('btnGenerate').addEventListener('click', generateTables);
+
+function generateTables() {
+  const area = document.getElementById('tablesArea');
+  area.innerHTML = '';
+
+  const selectedItems = state.allItems.filter(i => state.selectedItems.includes(i.id));
+  if (selectedItems.length === 0) {
+    area.innerHTML = '<div class="empty-state"><h3>Nessun item selezionato</h3><p>Seleziona almeno un item dal rundown.</p></div>';
+    return;
+  }
+
+  selectedItems.forEach(item => {
+    // Get notify groups belonging to this specific item that are selected
+    const itemGroups = (state.notifyByItem || [])
+      .find(n => n.item.id === item.id);
+    const selectedGroups = itemGroups
+      ? itemGroups.groups.filter(g => state.selectedNotifies.includes(g.id))
+      : [];
+
+    const block = buildItemTable(item, selectedGroups);
+    area.appendChild(block);
+  });
+}
+
+function buildItemTable(item, notifyGroups) {
+  const block = document.createElement('div');
+  block.className = 'item-table-block';
+
+  // Header
+  const hdr = document.createElement('div');
+  hdr.className = 'item-header';
+  hdr.innerHTML = `
+    <div class="item-title">${item.name}</div>
+    <div class="item-meta">${notifyGroups.length} notify track${notifyGroups.length !== 1 ? 's' : ''}</div>
+  `;
+  block.appendChild(hdr);
+
+  // Get this item's notify tracks for each selected group
+  // Each group has tracks[] with itemId; find the one matching this item
+  const columns = notifyGroups.map(g => {
+    const track = g.tracks.find(t => t.itemId === item.id);
+    const customName = state.customNames && state.customNames[g.id];
+    const colName = customName ? `${g.label} / ${customName}` : (g.label || g.name);
+    return { name: colName, track, cues: track ? track.cues : [] };
+  });
+
+  // Collect all notes from item
+  const itemNotes = item.notes ? item.notes.split('\n').filter(n => n.trim()) : [];
+
+  // Gather all timecodes from all cues
+  const allTimes = new Set();
+  columns.forEach(col => {
+    col.cues.forEach(cue => allTimes.add(cue.Start));
+  });
+
+  // Also add note markers at notable points if no cues
+  if (allTimes.size === 0) {
+    allTimes.add(0);
+  }
+
+  const sortedTimes = Array.from(allTimes).sort((a, b) => a - b);
+
+  // Build table
+  const wrapper = document.createElement('div');
+  wrapper.className = 'cue-table-wrapper';
+
+  const table = document.createElement('table');
+  table.className = 'cue-table';
+
+  // Header row
+  const thead = document.createElement('thead');
+  const hr = document.createElement('tr');
+  const thTC = document.createElement('th');
+  thTC.className = 'tc-col';
+  thTC.textContent = 'TIMECODE';
+  hr.appendChild(thTC);
+
+  // Note column if any notes
+  if (itemNotes.length > 0) {
+    const thN = document.createElement('th');
+    thN.textContent = 'NOTE ITEM';
+    thN.style.color = 'var(--accent2)';
+    hr.appendChild(thN);
+  }
+
+  columns.forEach(col => {
+    const th = document.createElement('th');
+    th.textContent = col.name;
+    th.title = col.name;
+    hr.appendChild(th);
+  });
+
+  thead.appendChild(hr);
+  table.appendChild(thead);
+
+  // Rows
+  const tbody = document.createElement('tbody');
+
+  // Build cue lookup: time -> cue[] per column
+  const cuesByTime = {};
+  sortedTimes.forEach(t => { cuesByTime[t] = {}; });
+  columns.forEach((col, ci) => {
+    col.cues.forEach(cue => {
+      if (!cuesByTime[cue.Start]) cuesByTime[cue.Start] = {};
+      if (!cuesByTime[cue.Start][ci]) cuesByTime[cue.Start][ci] = [];
+      cuesByTime[cue.Start][ci].push(cue);
+    });
+  });
+
+  // If we have item notes, add a note row at tc=0
+  if (itemNotes.length > 0 && !sortedTimes.includes(0)) {
+    sortedTimes.unshift(0);
+    sortedTimes.sort((a,b) => a-b);
+    cuesByTime[0] = cuesByTime[0] || {};
+  }
+
+  sortedTimes.forEach((tc, rowIdx) => {
+    const row = document.createElement('tr');
+
+    // TC cell
+    const tdTC = document.createElement('td');
+    tdTC.className = 'tc-cell';
+    tdTC.textContent = msToTCSimple(tc);
+    row.appendChild(tdTC);
+
+    // Note cell if applicable
+    if (itemNotes.length > 0) {
+      const tdN = document.createElement('td');
+      if (tc === 0) {
+        tdN.className = 'note-cell';
+        tdN.innerHTML = itemNotes.map(n => `<div>• ${n}</div>`).join('');
+      }
+      row.appendChild(tdN);
+    }
+
+    let hasContent = false;
+    // Notify columns
+    columns.forEach((col, ci) => {
+      const td = document.createElement('td');
+      const cues = cuesByTime[tc] && cuesByTime[tc][ci];
+      if (cues && cues.length) {
+        hasContent = true;
+        cues.forEach(cue => {
+          const div = document.createElement('div');
+          div.className = 'cue-text';
+          const colorDot = cue.color ? `<span class="cue-text-color" style="background:${cue.color}"></span>` : '';
+          div.innerHTML = colorDot + decode(cue.Text || '');
+          td.appendChild(div);
+        });
+      } else {
+        td.innerHTML = '<span class="empty-cell">—</span>';
+      }
+      row.appendChild(td);
+    });
+
+    tbody.appendChild(row);
+  });
+
+  // Empty table case
+  if (sortedTimes.length === 0) {
+    const row = document.createElement('tr');
+    const td = document.createElement('td');
+    td.colSpan = columns.length + 1 + (itemNotes.length > 0 ? 1 : 0);
+    td.style.textAlign = 'center';
+    td.style.color = 'var(--text-muted)';
+    td.style.padding = '32px';
+    td.textContent = 'Nessuna cue trovata nelle notify selezionate.';
+    row.appendChild(td);
+    tbody.appendChild(row);
+  }
+
+  table.appendChild(tbody);
+  wrapper.appendChild(table);
+  block.appendChild(wrapper);
+
+  return block;
+}
+
+// ========== PRINT ==========
+document.getElementById('btnPrint').addEventListener('click', () => {
+  window.print();
+});
+
+// ========== RESET (full) ==========
+function doFullReset() {
+  state = { mode: null, rawData: null, allItems: [], selectedItems: [], notifyTracks: [], selectedNotifies: [], notifyGroups: [], customNames: {} };
+  document.getElementById('singleLoaded').style.display = 'none';
+  document.getElementById('rundownLoaded').style.display = 'none';
+  document.getElementById('itemSelector').classList.remove('visible');
+  document.getElementById('notifySelector').classList.remove('visible');
+  document.getElementById('controls').style.display = 'none';
+  document.getElementById('tablesArea').innerHTML = '<div class="empty-state" id="emptyState"><h3>Nessun dato caricato</h3><p>Carica un file .cue singolo o il rundown completo<br>per visualizzare e confrontare le notify.</p></div>';
+  document.getElementById('modeBadge').style.display = 'none';
+  document.getElementById('fileSingle').value = '';
+  document.getElementById('fileRundown').value = '';
+}
+
+document.getElementById('btnReset').addEventListener('click', doFullReset);
+
+// Per-card reset buttons
+document.getElementById('btnResetSingle').addEventListener('click', () => {
+  if (state.mode === 'single') doFullReset();
+  else {
+    document.getElementById('singleLoaded').style.display = 'none';
+    document.getElementById('fileSingle').value = '';
+  }
+});
+
+document.getElementById('btnResetRundown').addEventListener('click', () => {
+  if (state.mode === 'rundown') doFullReset();
+  else {
+    document.getElementById('rundownLoaded').style.display = 'none';
+    document.getElementById('fileRundown').value = '';
+  }
+});
+
+// ========== FILE EVENTS ==========
+function setupDropZone(zoneId, inputId, mode) {
+  const zone = document.getElementById(zoneId);
+  const input = document.getElementById(inputId);
+
+  input.addEventListener('change', (e) => {
+    if (e.target.files[0]) loadFile(e.target.files[0], mode);
+  });
+
+  zone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    zone.classList.add('drag-over');
+  });
+
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+
+  zone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    zone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) loadFile(file, mode);
+  });
+}
+
+setupDropZone('dropSingle', 'fileSingle', 'single');
+setupDropZone('dropRundown', 'fileRundown', 'rundown');
+</script>
+</body>
+</html>
