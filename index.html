@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -325,6 +325,8 @@
   }
 
   .btn-print:hover { border-color: var(--accent3); color: var(--accent3); }
+  .btn-print:disabled { opacity: 0.3; cursor: not-allowed; }
+  .btn-print:disabled:hover { border-color: var(--border); color: var(--text-dim); }
 
   .tc-toggle {
     display: flex;
@@ -485,6 +487,24 @@
     max-width: 220px;
   }
 
+  .cue-times {
+    font-size: 9px;
+    color: var(--text-muted);
+    margin-top: 5px;
+    line-height: 1.8;
+    display: block;
+  }
+
+  .cue-times-label {
+    display: inline-block;
+    width: 26px;
+    color: var(--accent);
+    font-weight: 700;
+    font-size: 8px;
+    letter-spacing: 0.8px;
+    opacity: 0.7;
+  }
+
   .cue-text-color {
     display: inline-block;
     width: 6px; height: 6px;
@@ -528,6 +548,8 @@
     .cue-table th.tc-col { color: #0055aa !important; }
     .cue-table td { border: 1px solid #ddd; padding: 4px 8px; color: #111 !important; }
     .cue-text { color: #111 !important; }
+    .cue-times { color: #666 !important; font-size: 8px; }
+    .cue-times-label { color: #0055aa !important; }
     .empty-cell { color: #999 !important; }
     .tc-cell { color: #0055aa !important; }
     .note-row td { background: #fff8f0 !important; }
@@ -575,33 +597,33 @@
 <div class="upload-section">
   <!-- Single Item -->
   <div class="upload-card">
-    <h2>Singolo Item</h2>
-    <p>Carica un file .cue esportato come singolo item da CuePilot.<br>Genera una tabella per quell'item.</p>
+    <h2>Single Item</h2>
+    <p>Load a .cue file exported as a single item from CuePilot.<br>Generates one table for that item.</p>
     <div class="drop-zone" id="dropSingle">
       <input type="file" id="fileSingle" accept=".cue,.json" />
-      <span class="label">Trascina il file .cue qui</span>
-      <span class="hint">oppure clicca per selezionare</span>
+      <span class="label">Drop .cue file here</span>
+      <span class="hint">or click to select</span>
     </div>
     <div id="singleLoaded" style="display:none" class="file-loaded">
       <span class="dot"></span>
       <span id="singleFileName" style="flex:1">—</span>
-      <button class="btn-reset-card" id="btnResetSingle" title="Rimuovi file">✕</button>
+      <button class="btn-reset-card" id="btnResetSingle" title="Remove file">✕</button>
     </div>
   </div>
 
   <!-- Rundown -->
   <div class="upload-card">
-    <h2>Rundown Completo</h2>
-    <p>Carica un file .cue dell'intero rundown da CuePilot.<br>Genera una tabella per ogni item del rundown.</p>
+    <h2>Full Rundown</h2>
+    <p>Load a .cue file of the full rundown from CuePilot.<br>Generates one table per item in the rundown.</p>
     <div class="drop-zone" id="dropRundown">
       <input type="file" id="fileRundown" accept=".cue,.json" />
-      <span class="label">Trascina il file .cue qui</span>
-      <span class="hint">oppure clicca per selezionare</span>
+      <span class="label">Drop .cue file here</span>
+      <span class="hint">or click to select</span>
     </div>
     <div id="rundownLoaded" style="display:none" class="file-loaded">
       <span class="dot"></span>
       <span id="rundownFileName" style="flex:1">—</span>
-      <button class="btn-reset-card" id="btnResetRundown" title="Rimuovi file">✕</button>
+      <button class="btn-reset-card" id="btnResetRundown" title="Remove file">✕</button>
     </div>
   </div>
 </div>
@@ -609,8 +631,8 @@
 <!-- Item selector for rundown mode -->
 <div id="itemSelector">
   <div style="padding: 0 0 12px;">
-    <span class="section-label">Seleziona Items del Rundown</span>
-    <span style="font-size:10px; color:var(--text-muted); margin-left:8px;">(Seleziona "TUTTI" o singoli items)</span>
+    <span class="section-label">Select Rundown Items</span>
+    <span style="font-size:10px; color:var(--text-muted); margin-left:8px;">(Select "ALL" or individual items)</span>
   </div>
   <div class="item-chips" id="itemChips"></div>
 </div>
@@ -618,8 +640,8 @@
 <!-- Notify track selector -->
 <div id="notifySelector">
   <div style="padding: 0 0 12px;">
-    <span class="section-label">Seleziona Notify da confrontare</span>
-    <span style="font-size:10px; color:var(--text-muted); margin-left:8px;">(Massimo 4 colonne)</span>
+    <span class="section-label">Select Notify Tracks to Compare</span>
+    <span style="font-size:10px; color:var(--text-muted); margin-left:8px;">(Select one or more tracks per item)</span>
   </div>
   <div class="notify-list" id="notifyList"></div>
 </div>
@@ -627,7 +649,7 @@
 <!-- Action buttons -->
 <div class="controls" id="controls" style="display:none">
   <button class="btn btn-primary" id="btnGenerate">
-    ⚡ Genera Tabella
+    ⚡ Generate Table
   </button>
   <button class="btn btn-secondary" id="btnReset">
     ↺ Reset
@@ -635,19 +657,19 @@
   <!-- TC mode toggle -->
   <div class="tc-toggle no-print">
     <span class="tc-toggle-label">Timecode:</span>
-    <button class="tc-btn active" id="tcRelative">Relativo</button>
-    <button class="tc-btn" id="tcOffset">Con Offset</button>
+    <button class="tc-btn active" id="tcRelative">Relative</button>
+    <button class="tc-btn" id="tcOffset">With Offset</button>
   </div>
-  <button class="btn btn-print no-print" id="btnPrint" style="margin-left:auto">
-    🖨️ Stampa / Salva PDF
+  <button class="btn btn-print no-print" id="btnPrint" style="margin-left:auto" disabled>
+    🖨️ Print / Save PDF
   </button>
 </div>
 
 <!-- Output -->
 <div id="tablesArea">
   <div class="empty-state" id="emptyState">
-    <h3>Nessun dato caricato</h3>
-    <p>Carica un file .cue singolo o il rundown completo<br>per visualizzare e confrontare le notify.</p>
+    <h3>No data loaded</h3>
+    <p>Load a single item .cue or the full rundown<br>to view and compare notify tracks.</p>
   </div>
 </div>
 
@@ -714,8 +736,9 @@ function parseCueFile(data) {
   trackEntries.forEach(e => {
     const content = JSON.parse(e.content || '{}');
     const name = decode(content.Name || content.name || 'Unknown');
+    const trackLabel = decode(content.label || '');
     const cues = content.cues || [];
-    trackMap[e.id] = { id: e.id, name, cues, content };
+    trackMap[e.id] = { id: e.id, name, trackLabel, cues, content };
   });
 
   // Parse items into a map first
@@ -801,6 +824,7 @@ function loadFile(file, mode) {
       buildNotifySelector();
       document.getElementById('controls').style.display = 'flex';
       document.getElementById('emptyState').style.display = 'none';
+      document.querySelector('.upload-section').style.display = 'none';
 
     } catch(err) {
       alert('Errore nel parsing del file: ' + err.message);
@@ -823,7 +847,7 @@ function buildItemSelector() {
   // "Tutti" chip
   const all = document.createElement('div');
   all.className = 'item-chip active';
-  all.textContent = 'TUTTI';
+  all.textContent = 'ALL';
   all.dataset.id = '__all__';
   all.addEventListener('click', () => {
     const allSelected = state.selectedItems.length === state.allItems.length;
@@ -891,10 +915,12 @@ function buildNotifySelector() {
 
     item.notifyTracks.forEach(track => {
       notifyIndex++;
-      const isGeneric = track.name.trim().toLowerCase() === 'notify';
+      // Use trackLabel if present, otherwise fall back to track name
+      const displayName = track.trackLabel || track.name;
+      const isGeneric = displayName.trim().toLowerCase() === 'notify';
       const label = isGeneric
         ? `Notify #${notifyIndex}`
-        : `Notify #${notifyIndex} / ${track.name}`;
+        : `Notify #${notifyIndex} / ${displayName}`;
       const group = {
         id: track.id,
         name: track.name,
@@ -940,12 +966,12 @@ function buildNotifySelector() {
 
     const count = document.createElement('div');
     count.className = 'notify-group-count';
-    count.textContent = `${groups.length} track`;
+    count.textContent = `${groups.length} track${groups.length !== 1 ? "s" : ""}`;
 
     // "Seleziona tutte" link for this item
     const selAll = document.createElement('span');
     selAll.style.cssText = 'font-size:10px; color:var(--accent); cursor:pointer; margin-left:auto; white-space:nowrap;';
-    selAll.textContent = 'seleziona tutte';
+    selAll.textContent = 'select all';
     selAll.addEventListener('click', () => {
       const allChecked = groups.every(g => state.selectedNotifies.includes(g.id));
       groups.forEach(g => {
@@ -958,7 +984,7 @@ function buildNotifySelector() {
           if (cb) cb.checked = true;
         }
       });
-      selAll.textContent = allChecked ? 'seleziona tutte' : 'deseleziona tutte';
+      selAll.textContent = allChecked ? 'select all' : 'deselect all';
     });
 
     hdr.appendChild(title);
@@ -1019,7 +1045,7 @@ function buildNotifySelector() {
 
       const inputLabel = document.createElement('span');
       inputLabel.style.cssText = 'font-size:9px; color:var(--text-muted); white-space:nowrap; letter-spacing:0.5px; flex-shrink:0;';
-      inputLabel.textContent = 'Rinomina:';
+      inputLabel.textContent = 'Rename:';
 
       const nameInput = document.createElement('input');
       nameInput.type = 'text';
@@ -1067,24 +1093,40 @@ document.getElementById('btnGenerate').addEventListener('click', generateTables)
 function generateTables() {
   const area = document.getElementById('tablesArea');
   area.innerHTML = '';
+  document.getElementById('btnPrint').disabled = true;
 
-  const selectedItems = state.allItems.filter(i => state.selectedItems.includes(i.id));
-  if (selectedItems.length === 0) {
-    area.innerHTML = '<div class="empty-state"><h3>Nessun item selezionato</h3><p>Seleziona almeno un item dal rundown.</p></div>';
+  // Must have at least one notify selected
+  if (state.selectedNotifies.length === 0) {
+    area.innerHTML = '<div class="empty-state"><h3>No notify tracks selected</h3><p>Select at least one notify track before generating the table.</p></div>';
     return;
   }
 
+  const selectedItems = state.allItems.filter(i => state.selectedItems.includes(i.id));
+  if (selectedItems.length === 0) {
+    area.innerHTML = '<div class="empty-state"><h3>No items selected</h3><p>Select at least one item from the rundown.</p></div>';
+    return;
+  }
+
+  let tableCount = 0;
   selectedItems.forEach(item => {
-    // Get notify groups belonging to this specific item that are selected
     const itemGroups = (state.notifyByItem || [])
       .find(n => n.item.id === item.id);
     const selectedGroups = itemGroups
       ? itemGroups.groups.filter(g => state.selectedNotifies.includes(g.id))
       : [];
 
+    if (selectedGroups.length === 0) return; // skip items with no selected tracks
+
     const block = buildItemTable(item, selectedGroups);
     area.appendChild(block);
+    tableCount++;
   });
+
+  if (tableCount > 0) {
+    document.getElementById('btnPrint').disabled = false;
+  } else {
+    area.innerHTML = '<div class="empty-state"><h3>No tracks selected</h3><p>Select at least one notify track to generate a table.</p></div>';
+  }
 }
 
 function buildItemTable(item, notifyGroups) {
@@ -1152,7 +1194,7 @@ function buildItemTable(item, notifyGroups) {
 
   if (itemNotes.length > 0) {
     const thN = document.createElement('th');
-    thN.textContent = 'NOTE ITEM';
+    thN.textContent = 'ITEM NOTES';
     thN.style.color = 'var(--accent2)';
     hr.appendChild(thN);
   }
@@ -1211,6 +1253,17 @@ function buildItemTable(item, notifyGroups) {
           div.className = 'cue-text';
           const colorDot = cue.color ? `<span class="cue-text-color" style="background:${cue.color}"></span>` : '';
           div.innerHTML = colorDot + decode(cue.Text || '');
+          // Time info: start / duration / end
+          const hasDuration = cue.Duration != null && cue.Duration !== undefined;
+          if (hasDuration) {
+            const start = msToTCSimple(cue.Start + tcOffset);
+            const dur   = msToTCSimple(cue.Duration);
+            const end   = msToTCSimple(cue.Start + cue.Duration + tcOffset);
+            const timeDiv = document.createElement('div');
+            timeDiv.className = 'cue-times';
+            timeDiv.innerHTML = `<span class="cue-times-label">IN</span><span>${start}</span><br><span class="cue-times-label">OUT</span><span>${end}</span><br><span class="cue-times-label">DUR</span><span>${dur}</span>`;
+            div.appendChild(timeDiv);
+          }
           td.appendChild(div);
         });
       } else {
@@ -1229,7 +1282,7 @@ function buildItemTable(item, notifyGroups) {
     td.style.textAlign = 'center';
     td.style.color = 'var(--text-muted)';
     td.style.padding = '32px';
-    td.textContent = 'Nessuna cue trovata nelle notify selezionate.';
+    td.textContent = 'No cues found in the selected notify tracks.';
     row.appendChild(td);
     tbody.appendChild(row);
   }
@@ -1256,10 +1309,12 @@ function doFullReset() {
   document.getElementById('itemSelector').classList.remove('visible');
   document.getElementById('notifySelector').classList.remove('visible');
   document.getElementById('controls').style.display = 'none';
-  document.getElementById('tablesArea').innerHTML = '<div class="empty-state" id="emptyState"><h3>Nessun dato caricato</h3><p>Carica un file .cue singolo o il rundown completo<br>per visualizzare e confrontare le notify.</p></div>';
+  document.getElementById('tablesArea').innerHTML = '<div class="empty-state" id="emptyState"><h3>No data loaded</h3><p>Load a single item .cue or the full rundown<br>to view and compare notify tracks.</p></div>';
   document.getElementById('modeBadge').style.display = 'none';
   document.getElementById('fileSingle').value = '';
   document.getElementById('fileRundown').value = '';
+  document.getElementById('btnPrint').disabled = true;
+  document.querySelector('.upload-section').style.display = '';
 }
 
 document.getElementById('btnReset').addEventListener('click', doFullReset);
