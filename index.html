@@ -731,10 +731,11 @@ function parseCueFile(data) {
     ? (JSON.parse(rundownEntry.content || '{}').arrChildOrder || [])
     : [];
 
-  // Build track map by id for fast lookup
+  // Build track map by id for fast lookup — archived tracks excluded
   const trackMap = {};
   trackEntries.forEach(e => {
     const content = JSON.parse(e.content || '{}');
+    if (content.archived === 1 || content.archived === true) return;
     const name = decode(content.Name || content.name || 'Unknown');
     const trackLabel = decode(content.label || '');
     const cues = content.cues || [];
