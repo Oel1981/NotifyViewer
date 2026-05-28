@@ -1021,6 +1021,32 @@ function buildNotifySelector() {
       cb.addEventListener('change', () => {
         if (cb.checked) {
           if (!state.selectedNotifies.includes(group.id)) state.selectedNotifies.push(group.id);
+
+          // In rundown mode with multiple items, offer to select same position across all items
+          if (state.mode === 'rundown' && state.notifyByItem.length > 1) {
+            // Find the index of this group within its item
+            const myItemGroups = state.notifyByItem.find(n => n.item.id === group.itemId);
+            const myIndex = myItemGroups ? myItemGroups.groups.findIndex(g => g.id === group.id) : -1;
+
+            if (myIndex >= 0) {
+              // Check if there are other items that have a track at this index not yet selected
+              const others = state.notifyByItem
+                .filter(n => n.item.id !== group.itemId && n.groups[myIndex] && !state.selectedNotifies.includes(n.groups[myIndex].id));
+
+              if (others.length > 0) {
+                const label = group.label || `Notify #${myIndex + 1}`;
+                const confirm = window.confirm(`Apply "${label}" to all ${others.length} other item${others.length > 1 ? 's' : ''} in the rundown?`);
+                if (confirm) {
+                  others.forEach(n => {
+                    const g = n.groups[myIndex];
+                    if (!state.selectedNotifies.includes(g.id)) state.selectedNotifies.push(g.id);
+                    const otherCb = document.getElementById('cb_' + g.id);
+                    if (otherCb) otherCb.checked = true;
+                  });
+                }
+              }
+            }
+          }
         } else {
           state.selectedNotifies = state.selectedNotifies.filter(x => x !== group.id);
         }
