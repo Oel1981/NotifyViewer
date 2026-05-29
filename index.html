@@ -368,6 +368,72 @@
     color: var(--accent);
   }
 
+  /* === GENERATION HEADER === */
+  .gen-header {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    padding: 0 0 20px;
+    margin-bottom: 24px;
+    border-bottom: 2px solid var(--border);
+    gap: 16px;
+  }
+
+  .gen-header-center {
+    display: flex;
+    justify-content: center;
+  }
+
+  .gen-logo-svg {
+    width: 160px;
+    height: auto;
+    color: var(--text);
+    opacity: 0.9;
+  }
+
+  .gen-logo {
+    font-family: var(--display);
+    font-size: 27px;
+    font-weight: 800;
+    color: var(--text);
+    letter-spacing: 1px;
+    text-align: center;
+  }
+
+  .gen-project {
+    font-family: var(--display);
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--text);
+    letter-spacing: 1px;
+  }
+
+  .gen-rundown {
+    font-size: 12px;
+    color: var(--accent);
+    margin-top: 3px;
+    letter-spacing: 1px;
+    font-family: var(--mono);
+  }
+
+  .gen-header-right {
+    text-align: right;
+  }
+
+  .gen-date {
+    font-size: 13px;
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-weight: 600;
+  }
+
+  .gen-time {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: var(--mono);
+    margin-top: 2px;
+  }
+
   /* === TABLES AREA === */
   #tablesArea {
     padding: 0 32px 48px;
@@ -534,10 +600,19 @@
 
   /* === PRINT === */
   @media print {
+    @page {
+      margin: 12mm 10mm;
+    }
     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
     body { background: #fff !important; color: #111 !important; font-family: 'JetBrains Mono', monospace; }
     header, .upload-section, #itemSelector, #notifySelector, .controls, .no-print { display: none !important; }
     #tablesArea { padding: 0; }
+    .gen-header { border-bottom: 2px solid #ccc; margin-bottom: 20px; padding-bottom: 12px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px; }
+    .gen-header-center { display: flex; justify-content: center; }
+    .gen-logo { color: #111 !important; font-size: 22px; font-weight: 800; }
+    .gen-project { color: #111 !important; font-size: 18px; }
+    .gen-rundown { color: #0055aa !important; }
+    .gen-date, .gen-time { color: #444 !important; }
     .item-table-block { break-inside: avoid; margin-bottom: 32px; page-break-after: always; }
     .item-table-block:last-child { page-break-after: auto; }
     body.print-compact .item-table-block { page-break-after: auto; margin-bottom: 24px; }
@@ -733,6 +808,14 @@ function parseCueFile(data) {
   const trackEntries = entries.filter(e => e.category === 'track');
   const rundownEntry = entries.find(e => e.category === 'rundown');
 
+  const projectEntry = entries.find(e => e.category === 'project');
+  const projectName = projectEntry
+    ? decode(JSON.parse(projectEntry.content || '{}').Name || '')
+    : '';
+  const rundownName = rundownEntry
+    ? decode(JSON.parse(rundownEntry.content || '{}').Name || '')
+    : '';
+
   // Rundown-level child order (defines item order in the rundown)
   const rundownChildOrder = rundownEntry
     ? (JSON.parse(rundownEntry.content || '{}').arrChildOrder || [])
@@ -798,7 +881,7 @@ function parseCueFile(data) {
   // Assign positional index for fallback numbering
   items.forEach((item, i) => { item.index = i; });
 
-  return { items };
+  return { items, projectName, rundownName };
 }
 
 // ========== FILE LOADING ==========
@@ -811,6 +894,8 @@ function loadFile(file, mode) {
       state.rawData = data;
       const parsed = parseCueFile(data);
       state.allItems = parsed.items;
+      state.projectName = parsed.projectName;
+      state.rundownName = parsed.rundownName;
       state.selectedItems = [];
       state.selectedNotifies = [];
 
@@ -1140,6 +1225,28 @@ function generateTables() {
     area.innerHTML = '<div class="empty-state"><h3>No items selected</h3><p>Select at least one item from the rundown.</p></div>';
     return;
   }
+
+  // Build generation header
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
+  const timeStr = now.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+
+  const genHeader = document.createElement('div');
+  genHeader.className = 'gen-header';
+  genHeader.innerHTML = `
+    <div class="gen-header-left">
+      ${state.projectName ? `<div class="gen-project">${state.projectName}</div>` : ''}
+      ${state.rundownName ? `<div class="gen-rundown">${state.rundownName}</div>` : ''}
+    </div>
+    <div class="gen-header-center">
+      <div class="gen-logo">CuePilot</div>
+    </div>
+    <div class="gen-header-right">
+      <div class="gen-date">${dateStr}</div>
+      <div class="gen-time">${timeStr}</div>
+    </div>
+  `;
+  area.appendChild(genHeader);
 
   let tableCount = 0;
   selectedItems.forEach(item => {
