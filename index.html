@@ -647,6 +647,56 @@
   .mode-single { background: rgba(0,212,255,0.1); color: var(--accent); border: 1px solid rgba(0,212,255,0.2); }
   .mode-rundown { background: rgba(127,255,107,0.1); color: var(--accent3); border: 1px solid rgba(127,255,107,0.2); }
 
+  .btn-selall {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 4px 14px;
+    font-family: var(--mono);
+    font-size: 12.1px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-selall:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-selall.is-on {
+    color: #ff3333;
+    border-color: #ff3333;
+    box-shadow: 0 0 8px rgba(255,51,51,0.25);
+  }
+  #btnDeselectAllNotify.is-on {
+    color: #ffcc00;
+    border-color: #ffcc00;
+    box-shadow: 0 0 8px rgba(255,204,0,0.25);
+  }
+
+  .notify-section-label {
+    font-size: 14px !important;
+    letter-spacing: 2px;
+    color: var(--text) !important;
+  }
+  @keyframes selectPulse {
+    0%   { border-color: var(--border); }
+    40%  { border-color: #ff3333; box-shadow: 0 0 6px rgba(255,51,51,0.4); }
+    100% { border-color: var(--border); }
+  }
+
+  @keyframes deselectPulse {
+    0%   { border-color: var(--border); }
+    40%  { border-color: #ffcc00; box-shadow: 0 0 6px rgba(255,204,0,0.4); }
+    100% { border-color: var(--border); }
+  }
+
+  .notify-item.pulse-select {
+    animation: selectPulse 0.6s ease forwards;
+  }
+
+  .notify-item.pulse-deselect {
+    animation: deselectPulse 0.6s ease forwards;
+  }
+
   .btn-reset-card {
     background: none;
     border: none;
@@ -716,9 +766,10 @@
 
 <!-- Notify track selector -->
 <div id="notifySelector">
-  <div style="padding: 0 0 12px;">
-    <span class="section-label">Select Notify Tracks to Compare</span>
-    <span style="font-size:10px; color:var(--text-muted); margin-left:8px;">(Select one or more tracks per item)</span>
+  <div style="padding: 0 0 16px; margin-top: 12px; display:flex; align-items:baseline; gap:14px; flex-wrap:wrap;">
+    <span class="section-label notify-section-label">Select Notify Tracks to Compare</span>
+    <button class="btn-selall" id="btnSelectAllNotify">Select All</button>
+    <button class="btn-selall" id="btnDeselectAllNotify">Deselect All</button>
   </div>
   <div class="notify-list" id="notifyList"></div>
 </div>
@@ -1475,6 +1526,8 @@ function doFullReset() {
   document.getElementById('printBreak').classList.add('active');
   document.getElementById('printCompact').classList.remove('active');
   document.body.classList.remove('print-compact');
+  document.getElementById('btnSelectAllNotify').classList.remove('is-on');
+  document.getElementById('btnDeselectAllNotify').classList.remove('is-on');
   document.querySelector('.upload-section').style.display = '';
 }
 
@@ -1495,6 +1548,46 @@ document.getElementById('btnResetRundown').addEventListener('click', () => {
     document.getElementById('rundownLoaded').style.display = 'none';
     document.getElementById('fileRundown').value = '';
   }
+});
+
+// ========== SELECT / DESELECT ALL NOTIFY ==========
+document.getElementById('btnSelectAllNotify').addEventListener('click', () => {
+  const btn = document.getElementById('btnSelectAllNotify');
+  btn.classList.add('is-on');
+  setTimeout(() => btn.classList.remove('is-on'), 600);
+  document.getElementById('btnDeselectAllNotify').classList.remove('is-on');
+  state.notifyGroups.forEach(g => {
+    if (!state.selectedNotifies.includes(g.id)) state.selectedNotifies.push(g.id);
+    const cb = document.getElementById('cb_' + g.id);
+    if (cb) cb.checked = true;
+    // Animate border of the parent notify-item card
+    const card = cb ? cb.closest('.notify-item') : null;
+    if (card) {
+      card.classList.remove('pulse-select');
+      void card.offsetWidth; // force reflow to restart animation
+      card.classList.add('pulse-select');
+      card.addEventListener('animationend', () => card.classList.remove('pulse-select'), { once: true });
+    }
+  });
+});
+
+document.getElementById('btnDeselectAllNotify').addEventListener('click', () => {
+  const btn = document.getElementById('btnDeselectAllNotify');
+  btn.classList.add('is-on');
+  setTimeout(() => btn.classList.remove('is-on'), 600);
+  document.getElementById('btnSelectAllNotify').classList.remove('is-on');
+  state.selectedNotifies = [];
+  state.notifyGroups.forEach(g => {
+    const cb = document.getElementById('cb_' + g.id);
+    if (cb) cb.checked = false;
+    const card = cb ? cb.closest('.notify-item') : null;
+    if (card) {
+      card.classList.remove('pulse-deselect');
+      void card.offsetWidth;
+      card.classList.add('pulse-deselect');
+      card.addEventListener('animationend', () => card.classList.remove('pulse-deselect'), { once: true });
+    }
+  });
 });
 
 // ========== TC MODE TOGGLE ==========
