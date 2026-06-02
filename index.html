@@ -1394,15 +1394,17 @@ function buildItemTable(item, notifyGroups) {
           div.className = 'cue-text';
           const colorDot = cue.color ? `<span class="cue-text-color" style="background:${cue.color}"></span>` : '';
           div.innerHTML = colorDot + decode(cue.Text || '');
-          // Time info: start / duration / end
-          const hasDuration = cue.Duration != null && cue.Duration !== undefined;
-          if (hasDuration) {
+          if (cue.Duration != null) {
             const start = msToTCSimple(cue.Start + tcOffset);
-            const dur   = msToTCSimple(cue.Duration);
-            const end   = msToTCSimple(cue.Start + cue.Duration + tcOffset);
             const timeDiv = document.createElement('div');
             timeDiv.className = 'cue-times';
-            timeDiv.innerHTML = `<span class="cue-times-label">IN</span><span>${start}</span><br><span class="cue-times-label">OUT</span><span>${end}</span><br><span class="cue-times-label">DUR</span><span>${dur}</span>`;
+            if (cue.durationtype !== 0) {
+              const dur = msToTCSimple(cue.Duration);
+              const end = msToTCSimple(cue.Start + cue.Duration + tcOffset);
+              timeDiv.innerHTML = `<span class="cue-times-label">IN</span><span>${start}</span><br><span class="cue-times-label">OUT</span><span>${end}</span><br><span class="cue-times-label">DUR</span><span>${dur}</span>`;
+            } else {
+              timeDiv.innerHTML = `<span class="cue-times-label">IN</span><span>${start}</span>`;
+            }
             div.appendChild(timeDiv);
           }
           td.appendChild(div);
