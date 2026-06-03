@@ -672,6 +672,30 @@
     box-shadow: 0 0 8px rgba(255,204,0,0.25);
   }
 
+  .selpos-wrap {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+  }
+
+  .sel-pos-dropdown {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 4px 14px;
+    font-family: var(--mono);
+    font-size: 12.1px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    cursor: pointer;
+    outline: none;
+    transition: all 0.2s;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  .sel-pos-dropdown:hover, .sel-pos-dropdown:focus { border-color: var(--accent); color: var(--accent); }
+
   .notify-section-label {
     font-size: 14px !important;
     letter-spacing: 2px;
@@ -770,6 +794,11 @@
     <span class="section-label notify-section-label">Select Notify Tracks to Compare</span>
     <button class="btn-selall" id="btnSelectAllNotify">Select All</button>
     <button class="btn-selall" id="btnDeselectAllNotify">Deselect All</button>
+    <div class="selpos-wrap" id="selPosWrap" style="display:none">
+      <select class="sel-pos-dropdown" id="selPosDropdown">
+        <option value="">Select Notify #…</option>
+      </select>
+    </div>
   </div>
   <div class="notify-list" id="notifyList"></div>
 </div>
@@ -1088,8 +1117,24 @@ function buildNotifySelector() {
 
   if (allGroups.length === 0) {
     sel.classList.remove('visible');
+    document.getElementById('selPosWrap').style.display = 'none';
     return;
   }
+
+  // Populate position dropdown
+  const maxTracks = Math.max(...notifyByItem.map(n => n.groups.length), 0);
+  const dropdown = document.getElementById('selPosDropdown');
+  dropdown.innerHTML = '<option value="">Select Notify #…</option>';
+  for (let n = 1; n <= maxTracks; n++) {
+    const opt = document.createElement('option');
+    opt.value = n;
+    // Get label from first item that has this position
+    const sample = notifyByItem.find(nb => nb.groups[n-1]);
+    const lbl = sample ? sample.groups[n-1].label : `Notify #${n}`;
+    opt.textContent = lbl;
+    dropdown.appendChild(opt);
+  }
+  document.getElementById('selPosWrap').style.display = maxTracks > 0 ? 'flex' : 'none';
 
   sel.classList.add('visible');
   const list = document.getElementById('notifyList');
@@ -1528,6 +1573,8 @@ function doFullReset() {
   document.body.classList.remove('print-compact');
   document.getElementById('btnSelectAllNotify').classList.remove('is-on');
   document.getElementById('btnDeselectAllNotify').classList.remove('is-on');
+  document.getElementById('selPosWrap').style.display = 'none';
+  document.getElementById('selPosDropdown').innerHTML = '<option value="">Select Notify #…</option>';
   document.querySelector('.upload-section').style.display = '';
 }
 
@@ -1590,7 +1637,30 @@ document.getElementById('btnDeselectAllNotify').addEventListener('click', () => 
   });
 });
 
-// ========== TC MODE TOGGLE ==========
+document.getElementById('selPosDropdown').addEventListener('change', () => {
+  const idx = parseInt(document.getElementById('selPosDropdown').value, 10) - 1;
+  if (isNaN(idx) || idx < 0) return;
+
+  const dropdown = document.getElementById('selPosDropdown');
+  dropdown.style.borderColor = '#ff3333';
+  dropdown.style.color = '#ff3333';
+  setTimeout(() => { dropdown.style.borderColor = ''; dropdown.style.color = ''; }, 600);
+
+  state.notifyByItem.forEach(({ groups }) => {
+    const g = groups[idx];
+    if (!g) return;
+    if (!state.selectedNotifies.includes(g.id)) state.selectedNotifies.push(g.id);
+    const cb = document.getElementById('cb_' + g.id);
+    if (cb) cb.checked = true;
+    const card = cb ? cb.closest('.notify-item') : null;
+    if (card) {
+      card.classList.remove('pulse-select');
+      void card.offsetWidth;
+      card.classList.add('pulse-select');
+      card.addEventListener('animationend', () => card.classList.remove('pulse-select'), { once: true });
+    }
+  });
+});
 document.getElementById('tcRelative').addEventListener('click', () => {
   state.tcMode = 'relative';
   document.getElementById('tcRelative').classList.add('active');
